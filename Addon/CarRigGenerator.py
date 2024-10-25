@@ -19,6 +19,20 @@ class CarPartsParameters(bpy.types.PropertyGroup):
     front_wheel: bpy.props.StringProperty(name="Object Name")
     back_wheel: bpy.props.StringProperty(name="Object Name")
 
+class CarRigGenerator(bpy.types.Operator):
+    bl_idname = "object.car_rig_generator"
+    bl_label = "CarRigGenerator"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        car_parts = context.scene.car_parts_parameters
+
+        if car_parts.car_body and car_parts.front_wheel and car_parts.back_wheel:
+            print("Executed")
+        else:
+            print("No object selected")
+        return {'FINISHED'}
+
 class CarRigGeneratorUi(bpy.types.Panel):
     bl_idname = "car_rig_generator_ui"
     bl_label = "CarRigGeneratorUi"
@@ -40,11 +54,14 @@ class CarRigGeneratorUi(bpy.types.Panel):
 
         layout.label(text = "Back wheel:")
         layout.prop_search(selected_parts, "back_wheel", bpy.data, "objects", text="")
-        
-        # TODO 生成ボタン
+
+        layout.separator()
+
+        layout.operator(CarRigGenerator.bl_idname, text = "Generate rig")
 
 classes = [
     CarPartsParameters,
+    CarRigGenerator,
     CarRigGeneratorUi,
 ]
 
