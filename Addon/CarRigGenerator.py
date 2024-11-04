@@ -110,6 +110,16 @@ class CarRigGenerator(bpy.types.Operator):
             back_wheel_bone
         )
 
+        handle_bone_head = mathutils.Vector((primary_bone.head.x, front_wheel_bone.tail.y, primary_bone.head.z))
+        handle_bone = self.add_bone(
+            armature_data,
+            "Handle",
+            handle_bone_head,
+            handle_bone_head + mathutils.Vector((0, 0, 1)),
+            primary_bone.roll,
+            root_bone
+        )
+ 
         bpy.ops.object.mode_set(mode='OBJECT')
 
         collection_name = "ControllerCurves"
@@ -155,6 +165,9 @@ class CarRigGenerator(bpy.types.Operator):
 
         back_wheel_sub_controller_scale = (1 / back_wheel_bone_length) * 1.2
 
+        handle_controller_location = (0, primary_bone_length * 1.5, 0)
+        handle_controller_scale = 0.1
+
         custom_shapes = {
             "Primary": (primary_controller, primary_controller_location, (90, 0, 0), primary_controller_scale),
             "Root": (root_controller, primary_controller_location, (90, 0, 0), primary_controller_scale),
@@ -162,6 +175,7 @@ class CarRigGenerator(bpy.types.Operator):
             "FrontWheelSub_L": (front_wheel_sub_controller, (0, 0, 0), (90, 0, 0), front_wheel_sub_controller_scale),
             "BackWheel_L": (back_wheel_controller, back_wheel_controller_location, (90, 0, 0), back_wheel_controller_scale),
             "BackWheelSub_L": (back_wheel_sub_controller, (0, 0, 0), (90, 0, 0), back_wheel_sub_controller_scale),
+            "Handle": (primary_controller, handle_controller_location, (0, 0, 0), handle_controller_scale)
         }
 
         # 作成したアーマチュアを選択し直して、ポーズモードに入る
@@ -183,6 +197,25 @@ class CarRigGenerator(bpy.types.Operator):
                 pose_bone.custom_shape_scale_xyz = (scale, scale, scale)
 
         curve_collection.hide_viewport = True
+
+        ### driver設定
+        # ハンドル機能
+        self.add_rotation_driver(new_armature, "SteeringBone_L", "Handle", 0, 'ROT_W')
+        self.add_rotation_driver(new_armature, "SteeringBone_L", "Handle", 3, 'ROT_Z')
+
+        # TODO 後ろや左右のタイヤが一緒に動くかどうか
+
+        # 左右対称化するために編集モードに
+        bpy.ops.object.mode_set(mode='EDIT')
+        # ボーンを全選択して左右対称化
+        bpy.ops.armature.select_all(action='SELECT')
+        bpy.ops.armature.symmetrize()
+
+        bpy.ops.object.mode_set(mode='POSE')
+
+        # TODO refactor 新しくドライバーを設定しなくても済むようにしたい
+        self.add_rotation_driver(new_armature, "SteeringBone_R", "Handle", 0, 'ROT_W')
+        self.add_rotation_driver(new_armature, "SteeringBone_R", "Handle", 3, 'ROT_Z')
 
         bpy.ops.object.mode_set(mode='OBJECT')
 
@@ -259,6 +292,18 @@ class CarRigGenerator(bpy.types.Operator):
     def to_collection(self, target, collection):
         collection.objects.link(target)
         bpy.context.collection.objects.unlink(target)
+
+    def add_rotation_driver(self, armature, target_bone_name, control_bone_name, index, transform_type):
+        target_bone = armature.pose.bones.get(target_bone_name)
+        driver = target_bone.driver_add("rotation_quaternion", index).driver
+
+        var = driver.variables.new()
+        var.name = "control_rotation"
+        var.targets[0].id = armature
+        var.targets[0].data_path = f'pose.bones["{control_bone_name}"].rotation_quaternion[{index}]'
+        var.targets[0].transform_type = transform_type
+
+        driver.expression = "control_rotation"
 
 
 class CarRigGeneratorUi(bpy.types.Panel):
